@@ -19,8 +19,13 @@ class HexMap:
         self.camera = Camera(screen_width, screen_height)
         self.noise_generator = PerlinNoiseGenerator(scale)
 
+        self.polygons = []
+        self.map = {}
+        self.user = {}
+
         # Создаём структуру для хранения всех вершин с информацией о каждой ячейке
         self.map_grid = []
+        
         for q in range(cols):
             for r in range(rows):
                 noise_value = self.noise_generator.get_noise(q, r)
@@ -31,6 +36,13 @@ class HexMap:
                         "type": "empty",  
                         "content": None   
                     })
+                user_territory = r < 4 and q < 4
+
+                self.map[(r, q)] = {
+                    "type": "empty",
+                    "content": None,
+                    "territory": user_territory,
+                }
 
     # Функция для генерации координат вершин гексагона
     def hex_corner(self, center_x, center_y, size, i):
@@ -39,9 +51,9 @@ class HexMap:
         return center_x + size * math.cos(angle_rad), center_y + size * math.sin(angle_rad)
 
     # Функция для отрисовки гексагона
-    def draw_hexagon(self, center_x, center_y):
+    def draw_hexagon(self, center_x, center_y, color):
         corners = [self.hex_corner(center_x, center_y, self.size, i) for i in range(6)]
-        pygame.draw.polygon(self.screen, (0, 255, 0), corners, 1)
+        return pygame.draw.polygon(self.screen, color, corners, 1)
 
     # Преобразование из осевых координат в пиксельные для odd-q горизонтальной системы
     def hex_to_pixel(self, q, r):
@@ -51,16 +63,35 @@ class HexMap:
 
     # Отрисовка всей карты
     def draw_map(self):
-        self.screen.fill((0, 0, 0))  
+        self.screen.fill((0, 0, 0)) 
+        soldiers = [] 
+        color = (0, 255, 0)
+        color = (0, 255, 0)
         for q in range(self.cols):
             for r in range(self.rows):
+                color = (0, 255, 0)
                 x, y = self.hex_to_pixel(q, r)
                 x += self.camera.offset_x
                 y += self.camera.offset_y
-                self.draw_hexagon(x + self.screen_width // 4, y + self.screen_height // 4)  #
+
+                if self.map[(r, q)]["type"] != "empty":
+                    soldiers.append(((x + self.screen_width // 4, y + self.screen_height // 4), self.map[(r, q)]['content']))
+                
+                if self.map[(r, q)]['territory']:
+                    color = (255, 0, 0)
+                
+
+                polygon = self.draw_hexagon(x + self.screen_width // 4, y + self.screen_height // 4, color)  #
+                self.polygons.append({
+                    'hex': polygon,
+                    'pos': (r, q),
+                    'center_pos': (x + self.screen_width // 4, y + self.screen_height // 4)
+                })
+                
+        return soldiers
 
         
-        pygame.display.flip()  
+        # pygame.display.flip()  
 
     # Получение состояния карты 
     def get_map_state(self):
@@ -120,9 +151,47 @@ class HexMap:
 
             clock.tick(30)  # Обновление 30 раз в секунду
         pygame.quit()
+    
 
 
-
+    def handle_events(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_s:  # Сохранение карты при нажатии 'S'
+                self.save_to_json('hex_map.json')
+            elif event.key == pygame.K_l:  # Загрузка карты при нажатии 'L'
+                self.load_from_json('hex_map.json')
+            elif event.key == pygame.K_1:  # Пример изменения тайла
+                self.set_tile(2, 3, tile_type="obstacle", content="rock")
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 3:  
+                self.camera.start_drag(event.pos)
+        elif event.type == pygame.MOUSEMOTION:
+            if self.camera.dragging:
+                self.camera.drag(event.pos)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 3: 
+                    self.camera.stop_drag()
+                # elif event.button == 1:  # Left click
+                #     mouse_x, mouse_y = event.pos
+                #     q, r = self.pixel_to_hex(mouse_x - self.camera.offset_x, mouse_y - self.camera.offset_y)
+                #     tile = self.get_tile(q, r)
+                #     if tile:
+                #         print(f"Hex clicked at q={q}, r={r}, type={tile['type']}")
+   
+    def is_clicked(self, event, content):
+        # if content == None:
+        #     return False
+        for polygon in self.polygons:
+            if polygon['hex'].collidepoint(event.pos):
+                # print("Hex is clicked", polygon['pos'])
+                if self.map[polygon['pos']]['territory']:
+                    self.map[polygon['pos']]["type"] = content["type"]
+                    self.map[polygon['pos']]["content"] = content["level"]
+                
+                # print(self.map[polygon['pos']])
+                return True
+        return False
+       
 class Camera:
     def __init__(self, width, height):
         self.offset_x = 0
