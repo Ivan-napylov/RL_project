@@ -1,4 +1,5 @@
 import pygame
+from reward import CoinSystem
 
 class Button:
     def __init__(self, x, y, width, height, color, text):
@@ -21,7 +22,7 @@ class Button:
             self.level = 0
         # return self.soldiers_level[self.level]
         self.text = self.levels[self.level]
-        return {'type': 'soldier', 'level': self.text}
+        return {'type': 'soldier', 'level': self.level}
 
     def button_active(self):
         if self.level == -1:
@@ -36,21 +37,36 @@ class Button:
         text_surface = self.font.render(self.text, True, (255, 255, 255))
         screen.blit(text_surface, (self.rect.x + 10, self.rect.y + 10))
     
-    def define_type(self, text: str):
+    def define_type(self, level):
         color = (100, 0, 255)
-        if text[-1] == '1':
+        if  level == 1: #text[-1] == '1':
             color = (100, 0, 255)
-        elif text[-1] == '2':
+        elif level == 2: #text[-1] == '2':
             color = (0, 200, 255)
-        elif text[-1] == '3':
+        elif level == 3: #text[-1] == '3':
             color = (150, 255, 255)
         return color
+
+class Soldier:
+    def __init__(self, level=1):
+        self.level = level
+        self.health = 50 + (level * 10)  # Example: Each level increases health
+        self.attack = 10 + (level * 2)  # Example: Each level increases attack power
+        self.cost = 10 * level  # Cost increases with soldier level
+
+    def upgrade(self):
+        self.level += 1
+        self.health += 10  # Upgrade health
+        self.attack += 2   # Upgrade attack
+        self.cost = 10 * self.level  # Upgrade cost
+
 
 class Army(Button):
     def __init__(self, x, y, width, height, color, text):
         super().__init__(x, y, width, height, color, text)
 
         self.soldiers = []
+        self.coin_system = CoinSystem(initial_balance=0)
 
     def draw_entities(self, screen, entities):
         for pos, level in entities:
@@ -61,10 +77,26 @@ class Army(Button):
         for soldier in self.soldiers:
             if soldier.collidepoint(pos):
                 pass
+    
+    def buy_soldier(self, level):
+        soldier = Soldier(level)
+        if self.coin_system.spend(soldier.cost):
+            self.soldiers.append(soldier)
+            return True
+        return False
 
-class Barrier(Button):
-    def __init__(self, x, y, width, height, color, text):
-        super().__init__(x, y, width, height, color, text)
+    def upgrade_soldier(self, index):
+        if 0 <= index < len(self.soldiers):
+            self.soldiers[index].upgrade()
+    
+    def get_balance(self):
+        return self.coin_system.get_balance()
+    
+    def draw(self, screen):
+        for soldier in self.soldiers:
+            pygame.draw.circle(screen, self.define_type(soldier.level), (100, 100), 10) 
+
+
         
 
     

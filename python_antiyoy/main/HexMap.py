@@ -4,6 +4,13 @@ import json
 from perlin_noise import PerlinNoise
 from p_noise import PerlinNoiseGenerator
 
+class HexCell:
+    def __init__(self, q, c, content=None, occupied_by=""):
+        self.q, self.c = q, c
+        self.content = content
+        self.occupied_by = occupied_by
+        self.level = -1
+
 class HexMap:
     def __init__(self, cols, rows, size, screen_width, screen_height, scale=0.1):
         self.cols = cols  
@@ -20,9 +27,11 @@ class HexMap:
         self.noise_generator = PerlinNoiseGenerator(scale)
 
         self.polygons = []
-        self.map = {}
+        # self.map = {}
         self.user = {}
 
+        self.grid = [[HexCell(x, y) for y in range(cols)] for x in range(rows)]
+        
         # Создаём структуру для хранения всех вершин с информацией о каждой ячейке
         self.map_grid = []
         
@@ -38,11 +47,12 @@ class HexMap:
                     })
                 user_territory = r < 4 and q < 4
 
-                self.map[(r, q)] = {
-                    "type": "empty",
-                    "content": None,
-                    "territory": user_territory,
-                }
+                # self.map[(r, q)] = {
+                #     "type": "empty",
+                #     "content": None,
+                #     "territory": user_territory,
+                # }
+                self.grid[r][q].occupied_by = "army" if user_territory else ""
 
     # Функция для генерации координат вершин гексагона
     def hex_corner(self, center_x, center_y, size, i):
@@ -74,14 +84,16 @@ class HexMap:
                 x += self.camera.offset_x
                 y += self.camera.offset_y
 
-                if self.map[(r, q)]["type"] != "empty":
-                    soldiers.append(((x + self.screen_width // 4, y + self.screen_height // 4), self.map[(r, q)]['content']))
+                if self.grid[q][r].occupied_by != "":
+                    soldiers.append(((x + self.screen_width // 4, y + self.screen_height // 4), self.grid[r][q].content))
                 
-                if self.map[(r, q)]['territory']:
+                # if self.map[(r, q)]['territory']:
+                #     color = (255, 0, 0)
+                if self.grid[r][q].occupied_by == "army":
                     color = (255, 0, 0)
                 
-
                 polygon = self.draw_hexagon(x + self.screen_width // 4, y + self.screen_height // 4, color)  #
+                
                 self.polygons.append({
                     'hex': polygon,
                     'pos': (r, q),
@@ -191,6 +203,54 @@ class HexMap:
                 # print(self.map[polygon['pos']])
                 return True
         return False
+    
+    def get_state(self):
+        # Example: each cell holds `0` (empty), `1` (Army Level 1), `2` (Army Level 2), etc.
+        state = []
+        for row in self.grid:
+            state_row = []
+            for hex_cell in row:
+                if hex_cell.occupied_by == 'army':
+                    state_row.append(hex_cell.level)  # Army level
+                else:
+                    state_row.append(0)  # Empty cell
+            state.append(state_row)
+        return state
+    
+    def perform_action(self, x, y, content):
+        # Check if the cell is empty or occupied by an enemy
+        hex_cell = self.grid[x][y]
+
+        # Place soldier if the cell is empty
+        if hex_cell.occupied_by == None:
+            hex_cell.occupied_by = 'army'
+            hex_cell.level = content['level']
+            return 10, False  # Reward: 10 for placing a soldier, False means game isn't over
+        else:
+            # Penalize if the cell is already occupied
+            return -1, False  # Negative reward for invalid action (occupied cell)
+    
+    def get_neighbors(self, x, y):
+        """Returns a list of valid adjacent hexes around (x, y)."""
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1)]  # Hex directions (6 directions)
+        neighbors = []
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.rows and 0 <= ny < self.cols:  # Ensure within bounds
+                neighbors.append((nx, ny))
+        return neighbors
+
+    def expand_territory(self, x, y, army):
+        """Attempt to expand territory by placing a soldier in an adjacent hex."""
+        # Get valid neighbors where the army can expand
+        neighbors = self.get_neighbors(x, y)
+        for nx, ny in neighbors:
+            if self.hexes[nx][ny] is None:  # Empty space, valid for expansion
+                if army.buy_soldier(level=1):  # Try to buy a soldier
+                    self.hexes[nx][ny] = army  # Place army in the new hex
+                    return True
+        return False  # No valid expansion found
+
        
 class Camera:
     def __init__(self, width, height):

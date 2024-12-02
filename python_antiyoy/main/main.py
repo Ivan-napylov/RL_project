@@ -18,7 +18,7 @@ class Game():
 
         self.HexMap = HexMap(cols=10, rows=10, size=20, screen_width=800, screen_height=300)
         self.army = army.Army(20, 20, 120, 40, (255,0,0), " Army 1")
-        self.barrier = army.Barrier(20, 20 + 41 , 120, 40, (255,0,0), "Barrier Level 1")
+        # self.barrier = army.Barrier(20, 20 + 41 , 120, 40, (255,0,0), "Barrier Level 1")
 
         # создание игры и окна
         self.screen = pygame.display.set_mode((self.shirina, self.visota))
@@ -35,7 +35,7 @@ class Game():
             self.screen.fill((0, 0, 0))
             soldiers = self.HexMap.draw_map()
             self.army.draw(self.screen)
-            self.barrier.draw(self.screen)
+            # self.barrier.draw(self.screen)
             
             self.army.draw_entities(self.screen, soldiers)
             
