@@ -1,0 +1,8 @@
+HEIGHT=600
+WIDTH=1200
+FPS=60
+
+# colors
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
